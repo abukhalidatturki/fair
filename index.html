@@ -120,6 +120,19 @@ button{font:inherit;cursor:pointer;touch-action:manipulation;color:inherit}
 #recent .group-h span:last-child{font-weight:500}
 .del{border:0;background:none;color:var(--danger);font-size:22px;line-height:1;padding:4px 2px 4px 8px}
 
+.settle{background:var(--paper);border-radius:16px;padding:6px 16px 12px;margin-bottom:4px}
+.st-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:15px}
+.st-row:first-child{border-top:0}
+.st-row b{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.st-row.total{border-top:1.5px solid var(--ink)}
+.st-row.total span{font:700 18px var(--serif)}
+.st-row.total b{font:800 24px var(--serif);font-variant-numeric:lining-nums tabular-nums;color:var(--primary)}
+[data-theme=light] .st-row.total b{color:var(--primary)}
+.st-sub{font:700 16px var(--serif);margin:14px 0 2px}
+.st-row.owe span small{display:block;font-size:12px;color:var(--muted)}
+.st-warn{margin-top:10px;font-size:13px;line-height:1.45;color:var(--danger)}
+.miss{color:var(--danger)}
+.opt{font-size:12px;opacity:.85}
 .btn{display:block;width:100%;border:0;border-radius:13px;padding:14px;font-weight:650;background:var(--paper);color:var(--ink);margin-top:8px;text-align:center}
 .btn.primary{background:var(--primary);color:var(--primary-ink)}
 .btn.danger{color:var(--danger)}
@@ -273,7 +286,7 @@ function normalize(s){
   return {
     v: 1,
     books: Array.isArray(s.books) ? s.books.filter(function(b){ return b && b.id; }).map(function(b){
-      return { id:String(b.id), t:String(b.t || 'Без названия'), o:!!b.o, p:String(b.p || ''), pr:+b.pr || 0, q:Math.max(0, Math.floor(+b.q || 0)), h:!!b.h };
+      return { id:String(b.id), t:String(b.t || 'Без названия'), o:!!b.o, p:String(b.p || ''), pr:+b.pr || 0, q:Math.max(0, Math.floor(+b.q || 0)), h:!!b.h, c:(b.c === null || b.c === undefined || b.c === '' || !isFinite(+b.c)) ? null : +b.c };
     }) : [],
     sales: Array.isArray(s.sales) ? s.sales.filter(function(x){ return Array.isArray(x) && x.length >= 3; }).map(function(x){ return [+x[0], String(x[1]), +x[2] || 0]; }) : [],
     updatedAt: +s.updatedAt || 0
@@ -491,7 +504,7 @@ function renderGrid(){
 function bookRow(b, all){
   var sold = all[b.id] || 0, left = b.q - sold;
   return '<button class="row" data-edit="' + esc(b.id) + '"><span class="r-spine" style="--c:' + coverOf(b) + '"></span><div class="r-main"><div class="r-title">' + esc(b.t) + '</div>' +
-    '<div class="r-sub">' + money(b.pr) + ', привезено ' + b.q + ', продано ' + sold + '</div></div>' +
+    '<div class="r-sub">' + money(b.pr) + (b.c != null ? ' (закупка ' + money(b.c) + ')' : '') + ', привезено ' + b.q + ', продано ' + sold + '</div></div>' +
     '<div class="r-end"><small>остаток</small><b>' + left + '</b></div></button>';
 }
 function renderBooks(){
@@ -536,9 +549,14 @@ function buildReport(){
     var gq = 0, gs = 0;
     g[1].forEach(function(b){ gq += per[b.id].q; gs += per[b.id].s; });
     g[1].sort(function(a,b){ return per[b.id].s - per[a.id].s; });
-    return { key:g[0], name:groupName(g[0]), q:gq, s:gs, books:g[1] };
+    var gc = 0, missing = [];
+    g[1].forEach(function(b){ if (b.c != null) gc += per[b.id].q * b.c; else missing.push(b); });
+    return { key:g[0], own:g[0] === OWN, name:groupName(g[0]), q:gq, s:gs, books:g[1], cost:gc, missing:missing };
   });
-  return { sales:sales, per:per, tot:tot, own:own, oth:{ q:tot.q-own.q, s:tot.s-own.s }, groups:groups };
+  var owe = 0, ownCost = 0, missOth = [];
+  groups.forEach(function(g){ if (g.own) ownCost += g.cost; else { owe += g.cost; missOth = missOth.concat(g.missing); } });
+  return { sales:sales, per:per, tot:tot, own:own, oth:{ q:tot.q-own.q, s:tot.s-own.s }, groups:groups,
+           owe:owe, ownCost:ownCost, profit:tot.s - owe - ownCost, missOth:missOth };
 }
 function renderReport(){
   var days = {}; days[dayKey(Date.now())] = 1;
@@ -557,12 +575,30 @@ function renderReport(){
     h += '<div class="empty">За этот период продаж нет</div>';
     $('#v-report').innerHTML = h; return;
   }
+  var others = R.groups.filter(function(g){ return !g.own; });
+  h += '<div class="settle"><div class="st-row"><span>Выручка</span><b>' + money(R.tot.s) + '</b></div>' +
+    (others.length ? '<div class="st-row"><span>Отдать издательствам</span><b>−' + money(R.owe) + '</b></div>' : '') +
+    (R.ownCost > 0 ? '<div class="st-row"><span>Закупка моих книг</span><b>−' + money(R.ownCost) + '</b></div>' : '') +
+    '<div class="st-row total"><span>Заработал</span><b>' + money(R.profit) + '</b></div>';
+  if (others.length) {
+    h += '<div class="st-sub">Кому сколько отдать</div>' + others.map(function(g){
+      return '<div class="st-row owe"><span>' + esc(g.name) + '<small>' + pcs(g.q) + ' продано</small></span><b>' + money(g.cost) + '</b></div>';
+    }).join('');
+  }
+  if (R.missOth.length) {
+    h += '<div class="st-warn">Не указана закупочная цена: ' + R.missOth.map(function(b){ return '«' + esc(b.t) + '»'; }).join(', ') +
+      '. Пока они не вошли в долг, поэтому заработок завышен. Укажите закупку во вкладке «Книги».</div>';
+  }
+  h += '</div>';
+
   R.groups.forEach(function(g){
     h += '<div class="group-h"><span>' + esc(g.name) + '</span><span>' + pcs(g.q) + ', ' + money(g.s) + '</span></div><div class="list">' +
       g.books.map(function(b){
         var r = R.per[b.id], pr = Object.keys(r.prices);
         var sub = pr.length === 1 ? r.q + ' × ' + money(+pr[0]) : pcs(r.q);
         var left = byId(b.id) ? ', осталось ' + (b.q - (all[b.id]||0)) : '';
+        if (b.c != null) left += '<br>' + (g.own ? 'закупка ' : 'отдать ') + r.q + ' × ' + money(b.c) + ' = ' + money(r.q * b.c);
+        else if (!g.own) left += '<br><span class="miss">закупка не указана</span>';
         return '<div class="row"><span class="r-spine" style="--c:' + coverOf(b) + '"></span><div class="r-main"><div class="r-title">' + esc(b.t) + '</div><div class="r-sub">' + sub + left + '</div></div>' +
           '<div class="r-end"><b>' + money(r.s) + '</b></div></div>';
       }).join('') + '</div>';
@@ -583,8 +619,17 @@ function reportText(){
   var R = buildReport(), all = soldMaps().all;
   var L = ['📚 Отчёт по продажам: ' + periodTitle(), 'Итого: ' + pcs(R.tot.q) + ' · ' + money(R.tot.s),
            'Мои: ' + pcs(R.own.q) + ' · ' + money(R.own.s) + '  |  Другие: ' + pcs(R.oth.q) + ' · ' + money(R.oth.s)];
+  L.push('', 'Выручка: ' + money(R.tot.s));
+  var oth = R.groups.filter(function(g){ return !g.own; });
+  if (oth.length) {
+    L.push('Отдать издательствам: ' + money(R.owe));
+    oth.forEach(function(g){ L.push('  ' + g.name + ': ' + money(g.cost) + ' (' + pcs(g.q) + ')'); });
+  }
+  if (R.ownCost > 0) L.push('Закупка моих книг: ' + money(R.ownCost));
+  L.push('Заработал: ' + money(R.profit));
+  if (R.missOth.length) L.push('Без закупочной цены: ' + R.missOth.map(function(b){ return b.t; }).join(', '));
   R.groups.forEach(function(g){
-    L.push('', g.name.toUpperCase() + ' — ' + pcs(g.q) + ' · ' + money(g.s));
+    L.push('', g.name.toUpperCase() + ' — ' + pcs(g.q) + ' · ' + money(g.s) + (!g.own && g.cost ? ', отдать ' + money(g.cost) : ''));
     g.books.forEach(function(b){
       var r = R.per[b.id], pr = Object.keys(r.prices);
       var mid = pr.length === 1 ? r.q + ' × ' + num(+pr[0]) + ' = ' + money(r.s) : pcs(r.q) + ' = ' + money(r.s);
@@ -642,6 +687,7 @@ function openForm(id){
     '<datalist id="f-pubs">' + Object.keys(pubs).map(function(p){ return '<option value="' + esc(p) + '">'; }).join('') + '</datalist>' +
     '<div class="two"><label class="fld">Цена, ₽<input id="f-pr" inputmode="decimal" value="' + (b ? b.pr : '') + '" placeholder="500"></label>' +
     '<label class="fld">Привезено, шт<input id="f-q" inputmode="numeric" value="' + (b ? b.q : '') + '" placeholder="20"></label></div>' +
+    '<label class="fld">Закупочная цена, ₽ <span class="opt">(необязательно, видите только вы)</span><input id="f-c" inputmode="decimal" value="' + (b && b.c != null ? b.c : '') + '" placeholder="Почём взяли у оптовика"></label>' +
     (b ? '<div class="hint">Продано всего ' + sold + ', осталось ' + (b.q - sold) + '. Если довезли ещё, увеличьте «Привезено».</div>' : '') +
     '<div class="err" id="f-err"></div>' +
     '<button class="btn primary" data-act="save-book" data-id="' + esc(b ? b.id : '') + '">Сохранить</button>' +
@@ -653,16 +699,18 @@ function openForm(id){
 function saveBook(id){
   var t = $('#f-t').value.trim(), own = $('#f-seg .on').dataset.own === '1', p = $('#f-p').value.trim();
   var pr = parseNum($('#f-pr').value), qs = $('#f-q').value.trim(), q = qs === '' ? 0 : parseNum(qs);
+  var cs_ = $('#f-c').value.trim(), c = cs_ === '' ? null : parseNum(cs_);
   var err = '';
   if (!t) err = 'Введите название книги';
   else if (!own && !p) err = 'Укажите издательство';
   else if (!isFinite(pr) || pr < 0) err = 'Укажите цену';
   else if (!isFinite(q) || q < 0) err = 'Количество — целое число';
+  else if (c !== null && (!isFinite(c) || c < 0)) err = 'Закупочная цена — число или пусто';
   if (err) { $('#f-err').textContent = err; haptic('warn'); return; }
   q = Math.floor(q); lastOwn = own;
   var b = id ? byId(id) : null;
-  if (b) { b.t = t; b.o = own; b.p = own ? '' : p; b.pr = pr; b.q = q; }
-  else state.books.push({ id:uid(), t:t, o:own, p:own ? '' : p, pr:pr, q:q, h:false });
+  if (b) { b.t = t; b.o = own; b.p = own ? '' : p; b.pr = pr; b.q = q; b.c = c; }
+  else state.books.push({ id:uid(), t:t, o:own, p:own ? '' : p, pr:pr, q:q, h:false, c:c });
   persist(); closeModal(); renderAll(); haptic('ok');
   toast(b ? 'Сохранено' : 'Книга добавлена');
 }
