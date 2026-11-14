@@ -81,7 +81,8 @@ button{font:inherit;cursor:pointer;touch-action:manipulation;color:inherit}
 .cover.own .cv-body::before{content:"";position:absolute;inset:6px 7px 2px 17px;border:1px solid rgba(220,189,108,.6);border-radius:2px;box-shadow:inset 0 0 0 3px var(--c),inset 0 0 0 4px rgba(220,189,108,.38);pointer-events:none}
 .cv-top{display:flex;justify-content:flex-end;gap:6px;min-height:25px;position:relative}
 .cv-count{background:var(--foil);color:#211906;border-radius:999px;padding:3px 9px;font:700 13px/19px var(--sans);font-variant-numeric:tabular-nums}
-.cv-minus{background:rgba(0,0,0,.3);color:var(--cover-ink);border-radius:999px;padding:3px 10px;font:700 13px/19px var(--sans)}
+.cv-minus{background:rgba(0,0,0,.34);color:var(--cover-ink);border-radius:999px;padding:5px 12px;margin:-2px 0;font:700 14px/19px var(--sans);box-shadow:inset 0 0 0 1px rgba(246,238,219,.25)}
+.cv-minus:active{background:rgba(0,0,0,.5)}
 .cv-title{position:relative;font:700 18px/1.14 var(--serif);margin-top:4px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;text-wrap:balance}
 .cv-imprint{position:relative;margin-top:auto;padding-top:8px;font:italic 500 13.5px/1.2 var(--serif);color:rgba(246,238,219,.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cover.own .cv-imprint{color:var(--foil)}
@@ -114,6 +115,9 @@ button{font:inherit;cursor:pointer;touch-action:manipulation;color:inherit}
 .r-end small{color:var(--muted);font-size:12px}
 .r-time{font-size:13px;color:var(--muted);width:44px;flex:none;font-variant-numeric:tabular-nums}
 .r-time.wide{width:86px}
+.ret{border:0;background:var(--table);color:var(--ink);border-radius:999px;padding:8px 14px;font-size:14px;font-weight:650;flex:none}
+.ret:active{background:var(--line)}
+#recent .group-h span:last-child{font-weight:500}
 .del{border:0;background:none;color:var(--danger);font-size:22px;line-height:1;padding:4px 2px 4px 8px}
 
 .btn{display:block;width:100%;border:0;border-radius:13px;padding:14px;font-weight:650;background:var(--paper);color:var(--ink);margin-top:8px;text-align:center}
@@ -173,6 +177,7 @@ details.log[open] summary::after{content:" ▴"}
   </div>
   <input class="search" id="search" type="search" placeholder="Поиск книги…" autocomplete="off" style="display:none">
   <div id="grid"></div>
+  <div id="recent"></div>
 </section>
 
 <section class="view" id="v-books"></section>
@@ -374,7 +379,7 @@ function toast(text, undo){
   $('#toast-b').style.display = undo ? '' : 'none';
   $('#toast').classList.add('on');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(function(){ $('#toast').classList.remove('on'); toastUndo = null; }, undo ? 4500 : 2200);
+  toastTimer = setTimeout(function(){ $('#toast').classList.remove('on'); toastUndo = null; }, undo ? 7000 : 2200);
 }
 $('#toast-b').addEventListener('click', function(){
   var f = toastUndo; toastUndo = null; $('#toast').classList.remove('on'); if (f) f();
@@ -403,15 +408,23 @@ function removeSale(ts, id){
   for (var i=state.sales.length-1;i>=0;i--) { if (state.sales[i][0] === ts && state.sales[i][1] === id) { state.sales.splice(i,1); persist(); return true; } }
   return false;
 }
+function restoreSale(sale){
+  var i = state.sales.length;
+  while (i > 0 && state.sales[i-1][0] > sale[0]) i--;
+  state.sales.splice(i, 0, sale);
+  persist(); renderAll(); toast('Продажа восстановлена');
+}
+function returnSale(sale){
+  if (!removeSale(sale[0], sale[1])) return;
+  haptic('undo'); renderAll();
+  var b = byId(sale[1]);
+  toast('Возврат: ' + (b ? b.t : 'книга') + ', ' + money(sale[2]), function(){ restoreSale(sale); });
+}
 function unsellLast(id){
   var tk = dayKey(Date.now());
   for (var i=state.sales.length-1;i>=0;i--) {
     var s = state.sales[i];
-    if (s[1] === id && dayKey(s[0]) === tk) {
-      state.sales.splice(i,1); persist(); haptic('undo'); renderSell();
-      var b = byId(id); toast('Минус одна: ' + (b ? b.t : 'книга'));
-      return;
-    }
+    if (s[1] === id && dayKey(s[0]) === tk) { returnSale(s.slice()); return; }
   }
 }
 
@@ -430,6 +443,21 @@ function renderSell(){
   $('#search').style.display = active.length > 6 ? '' : 'none';
   $('#sell-filters').style.display = active.length ? '' : 'none';
   renderGrid();
+  renderRecent();
+}
+function renderRecent(){
+  var tk = dayKey(Date.now()), rec = [];
+  for (var i=state.sales.length-1; i>=0 && rec.length<5; i--) if (dayKey(state.sales[i][0]) === tk) rec.push(state.sales[i]);
+  if (!rec.length) { $('#recent').innerHTML = ''; return; }
+  $('#recent').innerHTML = '<div class="group-h"><span>Последние продажи</span><span>нажали случайно? верните</span></div><div class="list">' +
+    rec.map(function(s){
+      var b = byId(s[1]);
+      return '<div class="row"><div class="r-time">' + timeLabel(s[0]) + '</div>' +
+        (b ? '<span class="r-spine" style="--c:' + coverOf(b) + '"></span>' : '') +
+        '<div class="r-main"><div class="r-title">' + esc(b ? b.t : 'Удалённая книга') + '</div><div class="r-sub">' + money(s[2]) + '</div></div>' +
+        '<button class="ret" data-ret="' + s[0] + '|' + esc(s[1]) + '">Вернуть</button></div>';
+    }).join('') + '</div>' +
+    '<div class="hint">Возврат убирает продажу из отчёта и возвращает книгу в остаток. Старые продажи можно удалить во вкладке «Отчёт».</div>';
 }
 function renderGrid(){
   var maps = soldMaps(), q = ui.q.trim().toLowerCase();
@@ -659,10 +687,15 @@ function renderAll(){ renderTab(); }
 
 /* ---------- events ---------- */
 document.addEventListener('click', function(e){
-  var t = e.target.closest('[data-minus],[data-sell],[data-tab],[data-filter],[data-period],[data-edit],[data-act],[data-delsale],[data-own]');
+  var t = e.target.closest('[data-ret],[data-minus],[data-sell],[data-tab],[data-filter],[data-period],[data-edit],[data-act],[data-delsale],[data-own]');
   if (!t) return;
   var d = t.dataset;
   if (d.minus !== undefined) { e.preventDefault(); unsellLast(d.minus); return; }
+  if (d.ret) {
+    var rp = d.ret.split('|'), rts = +rp[0], rid = rp.slice(1).join('|');
+    for (var k=state.sales.length-1;k>=0;k--) if (state.sales[k][0] === rts && state.sales[k][1] === rid) { returnSale(state.sales[k].slice()); break; }
+    return;
+  }
   if (d.sell !== undefined) { sell(d.sell); return; }
   if (d.tab) { showTab(d.tab); return; }
   if (d.filter) { ui.filter = d.filter; saveUI(); renderSell(); return; }
@@ -678,9 +711,8 @@ document.addEventListener('click', function(e){
   }
   if (d.delsale) {
     var parts = d.delsale.split('|'), ts = +parts[0], bid = parts.slice(1).join('|'), bk = byId(bid);
-    confirmDlg('Удалить продажу «' + (bk ? bk.t.slice(0,100) : 'книга') + '» в ' + timeLabel(ts) + '?', function(ok){
-      if (ok && removeSale(ts, bid)) { renderAll(); toast('Продажа удалена'); }
-    });
+    for (var q=state.sales.length-1;q>=0;q--) if (state.sales[q][0] === ts && state.sales[q][1] === bid) { returnSale(state.sales[q].slice()); break; }
+    void bk;
     return;
   }
   switch (d.act) {
