@@ -89,6 +89,15 @@ button{font:inherit;cursor:pointer;touch-action:manipulation;color:inherit}
 .cv-tag{position:relative;z-index:2;margin:0 9px 9px 20px;background:var(--cream);color:#2a2418;border-radius:4px;padding:6px 9px 6px 10px;display:flex;justify-content:space-between;align-items:baseline;gap:6px;box-shadow:0 1px 2px rgba(0,0,0,.28)}
 .cv-price{font:800 17px/1.2 var(--sans);font-variant-numeric:tabular-nums;white-space:nowrap}
 .cv-left{font:500 12px var(--sans);color:#6f6553;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cover.photo{background:#e9e6df;aspect-ratio:225/288;min-height:0}
+.cover.photo::before,.cover.photo::after{display:none}
+.cover.photo .cv-body::before{display:none!important}
+.cv-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.cover.photo .cv-body{padding:8px 8px 0}
+.cover.photo .cv-tag{margin:0 8px 8px;box-shadow:0 2px 8px rgba(0,0,0,.28)}
+.cv-mine{margin-right:auto;background:var(--foil);color:#211906;border-radius:999px;padding:3px 9px;font:700 12px/19px var(--sans)}
+.cover.photo .cv-minus{background:rgba(20,24,22,.62);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .cover.out{filter:grayscale(.9) brightness(.8)}
 .cover.out .cv-left{color:#a3322a;font-weight:700}
 .cover.flash{animation:lift .55s ease}
@@ -106,6 +115,20 @@ button{font:inherit;cursor:pointer;touch-action:manipulation;color:inherit}
 .list{background:var(--paper);border-radius:16px;overflow:hidden}
 .row{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;color:var(--ink);text-align:left;padding:12px 14px;border-top:1px solid var(--line)}
 .list>.row:first-child{border-top:0}
+.r-thumb{width:38px;height:49px;object-fit:cover;border-radius:3px;flex:none;background:#e9e6df}
+.photos{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 4px;margin-top:2px;scrollbar-width:none}
+.photos::-webkit-scrollbar{display:none}
+.ph{flex:none;width:62px;height:80px;border:0;padding:0;border-radius:6px;overflow:hidden;background:var(--paper);color:var(--muted);font-size:11.5px;line-height:1.2;box-shadow:0 0 0 1px var(--line)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph.on{box-shadow:0 0 0 3px var(--gold)}
+.ph.none{padding:6px}
+.cat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px}
+.cat-i{border:0;background:none;padding:0;text-align:left;color:var(--ink);display:flex;flex-direction:column;gap:3px}
+.cat-i img{width:100%;aspect-ratio:225/288;object-fit:cover;border-radius:6px;background:#e9e6df;margin-bottom:3px}
+.cat-t{font:700 13.5px/1.2 var(--serif)}
+.cat-v{font-size:12px;color:var(--muted)}
+.cat-p{font-size:13px;font-weight:700}
+.cat-p em{font-style:normal;font-weight:500;color:var(--muted);font-size:11.5px;display:block}
 .r-spine{width:6px;align-self:stretch;border-radius:2px;background:var(--c);flex:none}
 .r-main{flex:1;min-width:0}
 .r-title{font:700 16.5px/1.2 var(--serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
@@ -267,6 +290,36 @@ function parseNum(s){ var v = parseFloat(String(s).replace(/\s/g,'').replace(','
 function pcs(n){ return n + ' шт'; }
 function plural(n, one, few, many){ var a = Math.abs(n) % 100, b = a % 10; if (a > 10 && a < 20) return many; if (b > 1 && b < 5) return few; if (b === 1) return one; return many; }
 var COVERS = ['#1f5c4a','#6b2232','#26467a','#8a5d1c','#4b2f5e','#48582a','#1b5961','#5d3a28','#2f3f63','#7a2f4f'];
+/* photos from anbar.store */
+var CATALOG = [
+  { mine:true, id:'dumai-black',  t:'Думай и уверуй',  v:'чёрная обложка', pr:640,  k:['думай','уверуй'], col:['черн'] },
+  { mine:true, id:'dumai-white',  t:'Думай и уверуй',  v:'белая обложка',  pr:640,  k:['думай','уверуй'], col:['бел'] },
+  { mine:true, id:'poetomu',      t:'Поэтому я — верующий', pr:640, k:['поэтому','верующ'] },
+  { mine:true, id:'arabic-cards', t:'Словарь-карточки для изучающих арабский', pr:650, k:['карточк'] },
+  { mine:true, id:'tetrad',       t:'Тетрадь-словарь для записи арабских слов', pr:360, k:['тетрад'] },
+  { mine:true, id:'propis-blue',  t:'Пропись Корана', v:'синяя',      pr:320, k:['пропис'], col:['син'] },
+  { mine:true, id:'propis-green', t:'Пропись Корана', v:'зелёная',    pr:320, k:['пропис'], col:['зел'] },
+  { mine:true, id:'propis-black', t:'Пропись Корана', v:'чёрная',     pr:320, k:['пропис'], col:['черн'] },
+  { mine:true, id:'propis-brown', t:'Пропись Корана', v:'коричневая', pr:320, k:['пропис'], col:['коричн'] },
+  { id:'bez-mazhabov', t:'Без мазхабов? История одной полемики', v:'Рамадан аль-Бути', pr:780, k:['мазхаб'] },
+  { id:'pohody',       t:'Походы посланника Аллаха', pr:2200, k:['поход'] },
+  { id:'novovvedenie', t:'Нововведение в Исламе. 65 ответов', pr:700, k:['нововведен'] },
+  { id:'medicina',     t:'Достижения мусульман в области медицины', pr:650, k:['медицин'] },
+  { id:'navavi',       t:'Имам ан-Навави', v:'Али ат-Тантави', pr:500, k:['навави'] },
+  { id:'umar',         t:'История жизни Умара', v:'Али ат-Тантави', pr:650, k:['умар'] },
+  { id:'chto-znat',    t:'Что ты должен знать об Исламе', v:'Али ат-Тантави', pr:300, k:['должен','знать'] },
+  { id:'zapad',        t:'Исламский взгляд на западную цивилизацию', v:'Али ат-Тантави', pr:300, k:['запад'] }
+];
+function catById(id){ for (var i=0;i<CATALOG.length;i++) if (CATALOG[i].id === id) return CATALOG[i]; return null; }
+function normT(t){ return String(t || '').toLowerCase().replace(/ё/g,'е'); }
+function autoImg(title){
+  var t = normT(title), hits = CATALOG.filter(function(c){ return c.k.every(function(k){ return t.indexOf(k) >= 0; }); });
+  if (!hits.length) return null;
+  for (var i=0;i<hits.length;i++) if (hits[i].col && hits[i].col.some(function(w){ return t.indexOf(w) >= 0; })) return hits[i].id;
+  return hits[0].id;
+}
+function imgOf(b){ if (b.img === '') return null; if (b.img && catById(b.img)) return b.img; return autoImg(b.t); }
+function imgSrc(id){ return 'covers/' + id + '.jpg'; }
 function coverOf(b){ var i = state.books.indexOf(b); if (i < 0) i = 0; return COVERS[i % COVERS.length]; }
 function ledger(label, q, sum, oq, osum){
   var ownPct = sum > 0 ? osum / sum * 100 : (q > 0 ? oq / q * 100 : 0), othPct = (sum > 0 || q > 0) ? 100 - ownPct : 0;
@@ -286,7 +339,7 @@ function normalize(s){
   return {
     v: 1,
     books: Array.isArray(s.books) ? s.books.filter(function(b){ return b && b.id; }).map(function(b){
-      return { id:String(b.id), t:String(b.t || 'Без названия'), o:!!b.o, p:String(b.p || ''), pr:+b.pr || 0, q:Math.max(0, Math.floor(+b.q || 0)), h:!!b.h, c:(b.c === null || b.c === undefined || b.c === '' || !isFinite(+b.c)) ? null : +b.c };
+      return { id:String(b.id), t:String(b.t || 'Без названия'), o:!!b.o, p:String(b.p || ''), pr:+b.pr || 0, q:Math.max(0, Math.floor(+b.q || 0)), h:!!b.h, img:(typeof b.img === 'string' ? b.img : undefined), c:(b.c === null || b.c === undefined || b.c === '' || !isFinite(+b.c)) ? null : +b.c };
     }) : [],
     sales: Array.isArray(s.sales) ? s.sales.filter(function(x){ return Array.isArray(x) && x.length >= 3; }).map(function(x){ return [+x[0], String(x[1]), +x[2] || 0]; }) : [],
     updatedAt: +s.updatedAt || 0
@@ -466,7 +519,7 @@ function renderRecent(){
     rec.map(function(s){
       var b = byId(s[1]);
       return '<div class="row"><div class="r-time">' + timeLabel(s[0]) + '</div>' +
-        (b ? '<span class="r-spine" style="--c:' + coverOf(b) + '"></span>' : '') +
+        (b ? spineOrThumb(b) : '') +
         '<div class="r-main"><div class="r-title">' + esc(b ? b.t : 'Удалённая книга') + '</div><div class="r-sub">' + money(s[2]) + '</div></div>' +
         '<button class="ret" data-ret="' + s[0] + '|' + esc(s[1]) + '">Вернуть</button></div>';
     }).join('') + '</div>' +
@@ -489,28 +542,35 @@ function renderGrid(){
   if (!list.length) { $('#grid').innerHTML = '<div class="empty">Ничего не найдено</div>'; return; }
   $('#grid').innerHTML = '<div class="grid">' + list.map(function(b){
     var left = b.q - (maps.all[b.id] || 0), td = maps.today[b.id] || 0;
-    var cls = 'cover ' + (b.o ? 'own' : 'oth') + (left <= 0 ? ' out' : '') + (lastSold === b.id ? ' flash' : '');
+    var im = imgOf(b);
+    var cls = 'cover ' + (b.o ? 'own' : 'oth') + (im ? ' photo' : '') + (left <= 0 ? ' out' : '') + (lastSold === b.id ? ' flash' : '');
     return '<button class="' + cls + '" style="--c:' + coverOf(b) + '" data-sell="' + esc(b.id) + '" aria-label="Продать: ' + esc(b.t) + '">' +
-      '<div class="cv-body"><div class="cv-top">' +
+      (im ? '<img class="cv-img" src="' + imgSrc(im) + '" alt="" loading="lazy" decoding="async">' : '') +
+      '<div class="cv-body"><div class="cv-top">' + (im && b.o ? '<span class="cv-mine">моё</span>' : '') +
         (td ? '<span class="cv-minus" data-minus="' + esc(b.id) + '" role="button" aria-label="Отменить одну продажу">−1</span><span class="cv-count" title="Продано сегодня">×' + td + '</span>' : '') +
-      '</div><div class="cv-title">' + esc(b.t).replace(/ (—|–)/g, '\u00a0$1') + '</div>' +
-      '<div class="cv-imprint">' + (b.o ? 'моё издание' : esc(b.p || 'другое издательство')) + '</div></div>' +
+      '</div><div class="cv-title' + (im ? ' sr' : '') + '">' + esc(b.t).replace(/ (—|–)/g, '\u00a0$1') + '</div>' +
+      (im ? '' : '<div class="cv-imprint">') + (im ? '' : b.o ? 'моё издание' : esc(b.p || 'другое издательство')) + (im ? '' : '</div>') + '</div>' +
       '<div class="cv-tag"><span class="cv-price">' + money(b.pr) + '</span><span class="cv-left">' + (left <= 0 ? 'нет' : 'ост. ' + left) + '</span></div>' +
       '</button>';
   }).join('') + '</div>';
 }
 
 /* ---------- render: books ---------- */
+function spineOrThumb(b){
+  var im = imgOf(b);
+  return im ? '<img class="r-thumb" src="' + imgSrc(im) + '" alt="" loading="lazy">' : '<span class="r-spine" style="--c:' + coverOf(b) + '"></span>';
+}
 function bookRow(b, all){
   var sold = all[b.id] || 0, left = b.q - sold;
-  return '<button class="row" data-edit="' + esc(b.id) + '"><span class="r-spine" style="--c:' + coverOf(b) + '"></span><div class="r-main"><div class="r-title">' + esc(b.t) + '</div>' +
+  return '<button class="row" data-edit="' + esc(b.id) + '">' + spineOrThumb(b) + '<div class="r-main"><div class="r-title">' + esc(b.t) + '</div>' +
     '<div class="r-sub">' + money(b.pr) + (b.c != null ? ' (закупка ' + money(b.c) + ')' : '') + ', привезено ' + b.q + ', продано ' + sold + '</div></div>' +
     '<div class="r-end"><small>остаток</small><b>' + left + '</b></div></button>';
 }
 function renderBooks(){
   var all = soldMaps().all;
   var active = state.books.filter(function(b){ return !b.h; }), hidden = state.books.filter(function(b){ return b.h; });
-  var h = '<button class="btn primary" data-act="add-book" style="margin-top:2px">+ Добавить книгу</button>';
+  var h = '<div class="btns" style="margin-top:2px"><button class="btn primary" data-act="add-book">+ Новая книга</button>' +
+    '<button class="btn" data-act="catalog">Из каталога Anbar</button></div>';
   if (!state.books.length) h += '<div class="empty">Список пуст. Нажмите «Добавить книгу».</div>';
   grouped(active).forEach(function(g){
     var tot = g[1].reduce(function(a,b){ return a + b.q - (all[b.id]||0); }, 0);
@@ -599,7 +659,7 @@ function renderReport(){
         var left = byId(b.id) ? ', осталось ' + (b.q - (all[b.id]||0)) : '';
         if (b.c != null) left += '<br>' + (g.own ? 'закупка ' : 'отдать ') + r.q + ' × ' + money(b.c) + ' = ' + money(r.q * b.c);
         else if (!g.own) left += '<br><span class="miss">закупка не указана</span>';
-        return '<div class="row"><span class="r-spine" style="--c:' + coverOf(b) + '"></span><div class="r-main"><div class="r-title">' + esc(b.t) + '</div><div class="r-sub">' + sub + left + '</div></div>' +
+        return '<div class="row">' + spineOrThumb(b) + '<div class="r-main"><div class="r-title">' + esc(b.t) + '</div><div class="r-sub">' + sub + left + '</div></div>' +
           '<div class="r-end"><b>' + money(r.s) + '</b></div></div>';
       }).join('') + '</div>';
   });
@@ -674,18 +734,43 @@ if (inTG && ver('6.1')) { try { tg.BackButton.onClick(closeModal); } catch(e){} 
 ov.addEventListener('click', function(e){ if (e.target === ov) closeModal(); });
 
 var lastOwn = true;
-function openForm(id){
+var formImg; // undefined = auto by title, '' = no photo, id = chosen
+function photoPicker(){
+  var title = $('#f-t') ? $('#f-t').value : '';
+  var sel = formImg === undefined ? autoImg(title) : (formImg || null);
+  var el = $('#f-photos'); if (!el) return;
+  el.innerHTML = '<button type="button" class="ph none' + (sel ? '' : ' on') + '" data-ph="">Без фото</button>' +
+    CATALOG.map(function(c){
+      return '<button type="button" class="ph' + (sel === c.id ? ' on' : '') + '" data-ph="' + c.id + '" title="' + esc(c.t + (c.v ? ', ' + c.v : '')) + '"><img src="' + imgSrc(c.id) + '" alt="' + esc(c.t) + '" loading="lazy"></button>';
+    }).join('');
+  var on = el.querySelector('.ph.on'); if (on && on.scrollIntoView) { try { on.scrollIntoView({ block:'nearest', inline:'center' }); } catch(e){} }
+}
+function openCatalog(){
+  openModal('<h3>Каталог Anbar<button class="x" data-act="close">×</button></h3>' +
+    '<div class="hint" style="margin-top:-6px">Нажмите на книгу: название, цена и фото заполнятся сами.</div>' +
+    '<div class="cat">' + CATALOG.map(function(c){
+      var have = state.books.some(function(b){ return imgOf(b) === c.id; });
+      return '<button class="cat-i" data-cat="' + c.id + '"><img src="' + imgSrc(c.id) + '" alt="" loading="lazy">' +
+        '<span class="cat-t">' + esc(c.t) + '</span>' + (c.v ? '<span class="cat-v">' + esc(c.v) + '</span>' : '') +
+        '<span class="cat-p">' + money(c.pr) + (have ? ' <em>уже добавлена</em>' : '') + '</span></button>';
+    }).join('') + '</div>');
+}
+function openForm(id, catId){
   var b = id ? byId(id) : null, own = b ? b.o : lastOwn;
+  var cat = catId ? catById(catId) : null;
+  if (cat && cat.mine) own = true;
+  formImg = b ? b.img : (cat ? cat.id : undefined);
   var pubs = {}; state.books.forEach(function(x){ if (!x.o && x.p.trim()) pubs[x.p.trim()] = 1; });
   var sold = b ? (soldMaps().all[b.id] || 0) : 0;
   openModal(
     '<h3>' + (b ? 'Редактировать книгу' : 'Новая книга') + '<button class="x" data-act="close">×</button></h3>' +
-    '<label class="fld">Название<input id="f-t" value="' + esc(b ? b.t : '') + '" placeholder="Например: Думай и уверуй"></label>' +
+    '<label class="fld">Название<input id="f-t" value="' + esc(b ? b.t : (cat ? cat.t + (cat.col && cat.v ? ' (' + cat.v.replace(' обложка','') + ')' : '') : '')) + '" placeholder="Например: Думай и уверуй"></label>' +
+    '<div class="fld">Фото обложки<div class="photos" id="f-photos"></div></div>' +
     '<div class="seg' + (own ? '' : ' oth') + '" id="f-seg"><button type="button" data-own="1" class="' + (own ? 'on' : '') + '">Моё издательство</button>' +
     '<button type="button" data-own="0" class="' + (own ? '' : 'on') + '">Другое</button></div>' +
     '<label class="fld" id="f-p-wrap" style="' + (own ? 'display:none' : '') + '">Название издательства<input id="f-p" list="f-pubs" value="' + esc(b ? b.p : '') + '" placeholder="Издательство"></label>' +
     '<datalist id="f-pubs">' + Object.keys(pubs).map(function(p){ return '<option value="' + esc(p) + '">'; }).join('') + '</datalist>' +
-    '<div class="two"><label class="fld">Цена, ₽<input id="f-pr" inputmode="decimal" value="' + (b ? b.pr : '') + '" placeholder="500"></label>' +
+    '<div class="two"><label class="fld">Цена, ₽<input id="f-pr" inputmode="decimal" value="' + (b ? b.pr : (cat ? cat.pr : '')) + '" placeholder="500"></label>' +
     '<label class="fld">Привезено, шт<input id="f-q" inputmode="numeric" value="' + (b ? b.q : '') + '" placeholder="20"></label></div>' +
     '<label class="fld">Закупочная цена, ₽ <span class="opt">(необязательно, видите только вы)</span><input id="f-c" inputmode="decimal" value="' + (b && b.c != null ? b.c : '') + '" placeholder="Почём взяли у оптовика"></label>' +
     (b ? '<div class="hint">Продано всего ' + sold + ', осталось ' + (b.q - sold) + '. Если довезли ещё, увеличьте «Привезено».</div>' : '') +
@@ -694,7 +779,10 @@ function openForm(id){
     (b ? '<div class="btns"><button class="btn" data-act="toggle-hide" data-id="' + esc(b.id) + '">' + (b.h ? 'Вернуть в продажу' : 'Скрыть из продажи') + '</button>' +
          '<button class="btn danger" data-act="del-book" data-id="' + esc(b.id) + '">Удалить</button></div>' : '')
   );
-  if (!b) setTimeout(function(){ var el = $('#f-t'); if (el) el.focus(); }, 60);
+  photoPicker();
+  $('#f-t').addEventListener('input', function(){ if (formImg === undefined) photoPicker(); });
+  if (!b && !cat) setTimeout(function(){ var el = $('#f-t'); if (el) el.focus(); }, 60);
+  if (cat) setTimeout(function(){ var el = $('#f-q'); if (el) el.focus(); }, 60);
 }
 function saveBook(id){
   var t = $('#f-t').value.trim(), own = $('#f-seg .on').dataset.own === '1', p = $('#f-p').value.trim();
@@ -709,8 +797,8 @@ function saveBook(id){
   if (err) { $('#f-err').textContent = err; haptic('warn'); return; }
   q = Math.floor(q); lastOwn = own;
   var b = id ? byId(id) : null;
-  if (b) { b.t = t; b.o = own; b.p = own ? '' : p; b.pr = pr; b.q = q; b.c = c; }
-  else state.books.push({ id:uid(), t:t, o:own, p:own ? '' : p, pr:pr, q:q, h:false, c:c });
+  if (b) { b.t = t; b.o = own; b.p = own ? '' : p; b.pr = pr; b.q = q; b.c = c; b.img = formImg; }
+  else state.books.push({ id:uid(), t:t, o:own, p:own ? '' : p, pr:pr, q:q, h:false, c:c, img:formImg });
   persist(); closeModal(); renderAll(); haptic('ok');
   toast(b ? 'Сохранено' : 'Книга добавлена');
 }
@@ -735,9 +823,15 @@ function renderAll(){ renderTab(); }
 
 /* ---------- events ---------- */
 document.addEventListener('click', function(e){
-  var t = e.target.closest('[data-ret],[data-minus],[data-sell],[data-tab],[data-filter],[data-period],[data-edit],[data-act],[data-delsale],[data-own]');
+  var t = e.target.closest('[data-ph],[data-cat],[data-ret],[data-minus],[data-sell],[data-tab],[data-filter],[data-period],[data-edit],[data-act],[data-delsale],[data-own]');
   if (!t) return;
   var d = t.dataset;
+  if (d.ph !== undefined) {
+    formImg = d.ph;
+    if (d.ph && !$('#f-t').value.trim()) { var cc = catById(d.ph); if (cc) { $('#f-t').value = cc.t; if (!$('#f-pr').value.trim()) $('#f-pr').value = cc.pr; } }
+    photoPicker(); return;
+  }
+  if (d.cat) { openForm(null, d.cat); return; }
   if (d.minus !== undefined) { e.preventDefault(); unsellLast(d.minus); return; }
   if (d.ret) {
     var rp = d.ret.split('|'), rts = +rp[0], rid = rp.slice(1).join('|');
@@ -766,6 +860,7 @@ document.addEventListener('click', function(e){
   switch (d.act) {
     case 'close': closeModal(); break;
     case 'add-book': openForm(null); break;
+    case 'catalog': openCatalog(); break;
     case 'save-book': saveBook(d.id || null); break;
     case 'toggle-hide': {
       var b = byId(d.id); if (!b) break;
