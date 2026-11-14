@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Книжная ярмарка — учёт продаж</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --fb-bg:#f1f1f5;--fb-card:#fff;--fb-text:#141414;--fb-hint:#8a8a90;--fb-accent:#2f7de1;--fb-accent-text:#fff;--fb-danger:#e0413a;
+  --bg:var(--tg-theme-secondary-bg-color,var(--fb-bg));
+  --card:var(--tg-theme-section-bg-color,var(--tg-theme-bg-color,var(--fb-card)));
+  --text:var(--tg-theme-text-color,var(--fb-text));
+  --hint:var(--tg-theme-hint-color,var(--fb-hint));
+  --accent:var(--tg-theme-button-color,var(--fb-accent));
+  --accent-text:var(--tg-theme-button-text-color,var(--fb-accent-text));
+  --danger:var(--tg-theme-destructive-text-color,var(--fb-danger));
+  --other:#e3912b;--ok:#2fb85a;--sep:rgba(128,128,128,.2);--r:14px;
+  --sb:max(env(safe-area-inset-bottom,0px),var(--tg-safe-area-inset-bottom,0px));
+}
+@media (prefers-color-scheme:dark){:root{--fb-bg:#101014;--fb-card:#1c1c22;--fb-text:#f2f2f5;--fb-hint:#8d8d96}}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+body{padding-bottom:calc(66px + var(--sb))}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px 6px}
+.top h1{font-size:17px;margin:0;font-weight:750}
+.sync{font-size:12px;color:var(--hint);white-space:nowrap}
+.view{display:none;padding:6px 12px 16px}.view.on{display:block}
+
+.sum{background:var(--accent);color:var(--accent-text);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
+.sum-label{font-size:13px;opacity:.85}
+.sum-big{font-size:26px;font-weight:800;letter-spacing:-.3px;margin-top:2px}
+.sum-split{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-top:6px;opacity:.95}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--accent)}
+.dot.oth{background:var(--other)}
+.sum .dot.own{background:var(--accent-text)}
+
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{border:0;background:var(--card);color:var(--text);padding:7px 13px;border-radius:999px;font-size:14px;white-space:nowrap;flex:none}
+.chip.on{background:var(--text);color:var(--bg)}
+.search{width:100%;border:0;background:var(--card);color:var(--text);border-radius:12px;padding:10px 12px;font:inherit;font-size:16px;margin-bottom:10px;outline:none}
+
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:560px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.card{position:relative;text-align:left;border:0;border-radius:var(--r);background:var(--card);color:var(--text);padding:12px 12px 10px 15px;min-height:122px;display:flex;flex-direction:column;gap:4px;user-select:none;-webkit-user-select:none;overflow:hidden;transition:transform .08s}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--accent)}
+.card.oth::before{background:var(--other)}
+.card:active{transform:scale(.96)}
+.card.out{opacity:.5}
+.card.flash{animation:flash .55s ease}
+@keyframes flash{0%{box-shadow:inset 0 0 0 3px var(--ok);background:rgba(47,184,90,.22)}100%{box-shadow:inset 0 0 0 3px transparent}}
+.c-title{font-weight:650;font-size:15px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.card.has-minus .c-title{padding-right:38px}
+.c-pub{font-size:12px;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-row{margin-top:auto;display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.c-price{font-weight:800;font-size:17px;white-space:nowrap}
+.c-left{font-size:12px;color:var(--hint);white-space:nowrap}
+.c-today{font-size:12px;font-weight:700;color:var(--accent)}
+.card.oth .c-today{color:var(--other)}
+.c-minus{position:absolute;top:7px;right:7px;background:var(--bg);color:var(--text);border-radius:9px;padding:5px 9px;font-size:13px;font-weight:700;line-height:1}
+
+.group-h{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--hint);margin:16px 4px 6px}
+.group-h span:last-child{text-transform:none;letter-spacing:0;white-space:nowrap}
+.list{background:var(--card);border-radius:var(--r);overflow:hidden}
+.row{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;color:var(--text);text-align:left;padding:11px 14px;border-top:1px solid var(--sep)}
+.list>.row:first-child{border-top:0}
+.r-main{flex:1;min-width:0}
+.r-title{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.r-sub{font-size:13px;color:var(--hint);margin-top:2px}
+.r-end{text-align:right;white-space:nowrap}
+.r-end b{display:block;font-size:16px}
+.r-end small{color:var(--hint);font-size:12px}
+.r-time{font-size:13px;color:var(--hint);width:44px;flex:none}
+.r-time.wide{width:84px}
+.del{border:0;background:none;color:var(--danger);font-size:20px;line-height:1;padding:4px 2px 4px 8px}
+
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kpi{background:var(--card);border-radius:var(--r);padding:10px 11px}
+.kpi .k{font-size:12px;color:var(--hint)}
+.kpi b{display:block;font-size:20px;margin-top:2px}
+.kpi .s{font-size:13px;font-weight:600;white-space:nowrap}
+.kpi.main{background:var(--accent);color:var(--accent-text)}
+.kpi.main .k{color:inherit;opacity:.85}
+
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:13px;font-weight:650;background:var(--card);color:var(--text);margin-top:8px;text-align:center}
+.btn.primary{background:var(--accent);color:var(--accent-text)}
+.btn.danger{color:var(--danger)}
+.btns{display:flex;gap:8px}.btns .btn{flex:1}
+.hint{font-size:13px;color:var(--hint);margin:8px 4px}
+.empty{text-align:center;color:var(--hint);padding:36px 16px}
+.empty b{display:block;color:var(--text);font-size:17px;margin-bottom:6px}
+.section-t{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--hint);margin:22px 4px 4px}
+details.log{margin-top:16px}
+details.log summary{list-style:none;font-size:14px;font-weight:650;color:var(--accent);padding:6px 4px 8px;cursor:pointer}
+details.log summary::-webkit-details-marker{display:none}
+
+.nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--sep);padding-bottom:var(--sb);z-index:5}
+.nav button{flex:1;border:0;background:none;color:var(--hint);font-size:11px;padding:8px 0 7px;display:flex;flex-direction:column;align-items:center;gap:3px}
+.nav button.on{color:var(--accent)}
+.nav svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
+.toast{position:fixed;left:12px;right:12px;bottom:calc(74px + var(--sb));background:#222228;color:#fff;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;font-size:14px;transform:translateY(16px);opacity:0;pointer-events:none;transition:.18s;z-index:20;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.toast.on{opacity:1;transform:none;pointer-events:auto}
+.toast span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toast button{border:0;background:none;color:#8cc2ff;font-weight:700;padding:0;white-space:nowrap}
+
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.42);display:none;align-items:flex-end;justify-content:center;z-index:30}
+.ov.on{display:flex}
+.sheet{background:var(--bg);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:16px 16px calc(18px + var(--sb));max-height:92vh;overflow:auto}
+.sheet h3{margin:0 0 12px;font-size:18px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.x{border:0;background:var(--card);color:var(--hint);width:32px;height:32px;border-radius:50%;font-size:18px;line-height:1;flex:none}
+.fld{display:block;margin-bottom:10px;font-size:13px;color:var(--hint)}
+.fld input,.fld textarea{display:block;width:100%;margin-top:4px;border:0;border-radius:12px;background:var(--card);color:var(--text);padding:12px;font:inherit;font-size:16px;outline:none}
+.fld textarea{min-height:140px;resize:vertical;font-size:13px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;background:var(--card);border-radius:12px;padding:3px;margin-bottom:10px}
+.seg button{flex:1;border:0;background:none;color:var(--text);padding:9px 6px;border-radius:9px}
+.seg button.on{background:var(--accent);color:var(--accent-text);font-weight:650}
+.seg.oth button.on{background:var(--other);color:#fff}
+.err{color:var(--danger);font-size:13px;min-height:18px;margin:2px 4px}
+</style>
+</head>
+<body>
+
+<div class="top"><h1>📚 Книжная ярмарка</h1><div class="sync" id="sync"></div></div>
+
+<section class="view" id="v-sell">
+  <div id="sell-sum"></div>
+  <div class="chips" id="sell-filters">
+    <button class="chip" data-filter="all">Все</button>
+    <button class="chip" data-filter="own">Мои</button>
+    <button class="chip" data-filter="oth">Другие издательства</button>
+  </div>
+  <input class="search" id="search" type="search" placeholder="Поиск книги…" autocomplete="off" style="display:none">
+  <div id="grid"></div>
+</section>
+
+<section class="view" id="v-books"></section>
+<section class="view" id="v-report"></section>
+
+<nav class="nav">
+  <button data-tab="sell"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.2 10.2a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.5L20.5 8H6.1"/><circle cx="10" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg>Продажа</button>
+  <button data-tab="books"><svg viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2 1.5 1.5 0 0 0 1.5 1.5H19"/><path d="M9 7h6"/></svg>Книги</button>
+  <button data-tab="report"><svg viewBox="0 0 24 24"><path d="M5 20V10"/><path d="M12 20V4"/><path d="M19 20v-7"/></svg>Отчёт</button>
+</nav>
+
+<div class="toast" id="toast"><span id="toast-t"></span><button id="toast-b" style="display:none">Отменить</button></div>
+<div class="ov" id="ov"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- Telegram ---------- */
+var tg = (window.Telegram && window.Telegram.WebApp) || null;
+var inTG = !!(tg && tg.initData);
+function ver(v){ try { return !!(tg && tg.isVersionAtLeast(v)); } catch(e){ return false; } }
+if (tg) {
+  try { tg.ready(); tg.expand(); } catch(e){}
+  if (ver('6.1')) { try { tg.setHeaderColor('secondary_bg_color'); tg.setBackgroundColor('secondary_bg_color'); } catch(e){} }
+  if (ver('7.7')) { try { tg.disableVerticalSwipes(); } catch(e){} }
+}
+var cloud = (inTG && ver('6.9') && tg.CloudStorage) ? tg.CloudStorage : null;
+
+function haptic(kind){
+  if (!inTG || !ver('6.1')) return;
+  try {
+    if (kind === 'sell') tg.HapticFeedback.impactOccurred('medium');
+    else if (kind === 'undo') tg.HapticFeedback.impactOccurred('light');
+    else if (kind === 'warn') tg.HapticFeedback.notificationOccurred('warning');
+    else tg.HapticFeedback.notificationOccurred('success');
+  } catch(e){}
+}
+function confirmDlg(msg, cb){
+  if (inTG && ver('6.2')) { try { tg.showConfirm(msg, function(ok){ cb(!!ok); }); return; } catch(e){} }
+  cb(window.confirm(msg));
+}
+function alertDlg(msg){
+  if (inTG && ver('6.2')) { try { tg.showAlert(msg); return; } catch(e){} }
+  window.alert(msg);
+}
+
+/* ---------- helpers ---------- */
+var $ = function(s){ return document.querySelector(s); };
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function num(n){ return (Math.round(n*100)/100).toLocaleString('ru-RU'); }
+function money(n){ return num(n) + ' ₽'; }
+function uid(){ return Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2,6); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function dayKey(ts){ var d = new Date(ts); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+var MONTHS = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+function dayLabel(k){ if (k === dayKey(Date.now())) return 'Сегодня'; var p = k.split('-'); return (+p[2]) + ' ' + MONTHS[+p[1]-1]; }
+function dayFull(k){ var p = k.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
+function timeLabel(ts){ var d = new Date(ts); return pad(d.getHours())+':'+pad(d.getMinutes()); }
+function parseNum(s){ var v = parseFloat(String(s).replace(/\s/g,'').replace(',','.')); return isFinite(v) ? v : NaN; }
+function pcs(n){ return n + ' шт'; }
+
+/* ---------- state ---------- */
+// book: {id, t:title, o:own?, p:publisher name (for others), pr:price, q:brought qty, h:hidden}
+// sale: [timestamp, bookId, price]
+var LS = 'bookfair_state_v1', LS_UI = 'bookfair_ui_v1';
+function normalize(s){
+  s = (s && typeof s === 'object') ? s : {};
+  return {
+    v: 1,
+    books: Array.isArray(s.books) ? s.books.filter(function(b){ return b && b.id; }).map(function(b){
+      return { id:String(b.id), t:String(b.t || 'Без названия'), o:!!b.o, p:String(b.p || ''), pr:+b.pr || 0, q:Math.max(0, Math.floor(+b.q || 0)), h:!!b.h };
+    }) : [],
+    sales: Array.isArray(s.sales) ? s.sales.filter(function(x){ return Array.isArray(x) && x.length >= 3; }).map(function(x){ return [+x[0], String(x[1]), +x[2] || 0]; }) : [],
+    updatedAt: +s.updatedAt || 0
+  };
+}
+var state = normalize(null);
+try { var raw = localStorage.getItem(LS); if (raw) state = normalize(JSON.parse(raw)); } catch(e){}
+var ui = { tab:'sell', filter:'all', period:'today', q:'' };
+try { var u = JSON.parse(localStorage.getItem(LS_UI) || '{}'); if (u.tab) ui.tab = u.tab; if (u.filter) ui.filter = u.filter; } catch(e){}
+function saveUI(){ try { localStorage.setItem(LS_UI, JSON.stringify({ tab:ui.tab, filter:ui.filter })); } catch(e){} }
+
+function byId(id){ for (var i=0;i<state.books.length;i++) if (state.books[i].id === id) return state.books[i]; return null; }
+function saveLocal(){ try { localStorage.setItem(LS, JSON.stringify(state)); } catch(e){} }
+function persist(){ state.updatedAt = Date.now(); saveLocal(); scheduleCloud(); }
+
+/* ---------- Telegram CloudStorage sync (chunked, 4000 chars per key) ---------- */
+var CHUNK = 4000, cloudChunks = [], cloudReady = false, cloudBusy = false, cloudDirty = false, cloudTimer = null;
+function cs(method){
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function(res, rej){
+    try { cloud[method].apply(cloud, args.concat([function(err, val){ err ? rej(err) : res(val); }])); }
+    catch(e){ rej(e); }
+  });
+}
+function setSync(s){
+  var t = { local:'💾 на этом устройстве', loading:'⏳ загрузка…', saving:'⏳ сохраняю…', ok:'☁️ сохранено', err:'⚠️ нет связи — данные в телефоне' }[s] || '';
+  $('#sync').textContent = t;
+}
+function scheduleCloud(){
+  if (!cloud) return;
+  cloudDirty = true;
+  clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(flushCloud, 700);
+}
+function flushCloud(){
+  if (!cloud || !cloudReady || cloudBusy || !cloudDirty) return;
+  cloudBusy = true; cloudDirty = false; setSync('saving');
+  var s = JSON.stringify(state), chunks = [];
+  for (var i=0;i<s.length;i+=CHUNK) chunks.push(s.slice(i, i+CHUNK));
+  var chain = Promise.resolve();
+  chunks.forEach(function(c, i){ if (cloudChunks[i] !== c) chain = chain.then(function(){ return cs('setItem', 'c'+i, c); }); });
+  chain.then(function(){
+    return cs('setItem', 'meta', JSON.stringify({ n:chunks.length, u:state.updatedAt }));
+  }).then(function(){
+    var stale = [];
+    for (var j=chunks.length;j<cloudChunks.length;j++) stale.push('c'+j);
+    cloudChunks = chunks;
+    if (stale.length) return cs('removeItems', stale).catch(function(){});
+  }).then(function(){
+    setSync('ok');
+  }).catch(function(){
+    setSync('err'); cloudDirty = true;
+  }).then(function(){
+    cloudBusy = false;
+    if (cloudDirty) { clearTimeout(cloudTimer); cloudTimer = setTimeout(flushCloud, 2500); }
+  });
+}
+function loadCloud(){
+  if (!cloud) { setSync('local'); return; }
+  setSync('loading');
+  cs('getItem', 'meta').then(function(metaS){
+    if (!metaS) { cloudReady = true; if (state.updatedAt) { cloudDirty = true; flushCloud(); } else setSync('ok'); return; }
+    var meta = JSON.parse(metaS), keys = [];
+    for (var i=0;i<meta.n;i++) keys.push('c'+i);
+    return (keys.length ? cs('getItems', keys) : Promise.resolve({})).then(function(vals){
+      var chunks = keys.map(function(k){ return (vals && vals[k]) || ''; });
+      cloudChunks = chunks;
+      cloudReady = true;
+      if (meta.u > state.updatedAt) {
+        try {
+          var remote = normalize(JSON.parse(chunks.join('')));
+          remote.updatedAt = meta.u;
+          state = remote; saveLocal(); renderAll(); setSync('ok');
+        } catch(e) { cloudDirty = true; flushCloud(); }
+      } else if (meta.u < state.updatedAt || cloudDirty) { cloudDirty = true; flushCloud(); }
+      else setSync('ok');
+    });
+  }).catch(function(){ cloudReady = true; setSync('err'); if (cloudDirty) flushCloud(); });
+}
+
+/* ---------- computed ---------- */
+function soldMaps(){
+  var all = {}, today = {}, tk = dayKey(Date.now());
+  state.sales.forEach(function(s){ all[s[1]] = (all[s[1]]||0) + 1; if (dayKey(s[0]) === tk) today[s[1]] = (today[s[1]]||0) + 1; });
+  return { all:all, today:today };
+}
+var OWN = '\u0000own';
+function groupKey(b){ return b.o ? OWN : (b.p.trim() || 'Другое издательство'); }
+function groupName(k){ return k === OWN ? 'Мои книги' : k; }
+function grouped(books){
+  var m = {}, order = [];
+  books.forEach(function(b){ var k = groupKey(b); if (!m[k]) { m[k] = []; order.push(k); } m[k].push(b); });
+  order.sort(function(a,b){ return a === OWN ? -1 : b === OWN ? 1 : a.localeCompare(b, 'ru'); });
+  return order.map(function(k){ return [k, m[k]]; });
+}
+
+/* ---------- toast ---------- */
+var toastTimer = null, toastUndo = null;
+function toast(text, undo){
+  $('#toast-t').textContent = text;
+  toastUndo = undo || null;
+  $('#toast-b').style.display = undo ? '' : 'none';
+  $('#toast').classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ $('#toast').classList.remove('on'); toastUndo = null; }, undo ? 4500 : 2200);
+}
+$('#toast-b').addEventListener('click', function(){
+  var f = toastUndo; toastUndo = null; $('#toast').classList.remove('on'); if (f) f();
+});
+
+/* ---------- selling ---------- */
+var lastSold = null;
+function sell(id){
+  var b = byId(id); if (!b) return;
+  var left = b.q - (soldMaps().all[id] || 0);
+  if (left <= 0) {
+    haptic('warn');
+    confirmDlg('«' + b.t.slice(0,120) + '»: по учёту книги закончились. Всё равно отметить продажу?', function(ok){ if (ok) doSell(b); });
+    return;
+  }
+  doSell(b);
+}
+function doSell(b){
+  var sale = [Date.now(), b.id, b.pr];
+  state.sales.push(sale);
+  persist(); haptic('sell');
+  lastSold = b.id; renderSell(); lastSold = null;
+  toast('Продано: ' + b.t + ' · ' + money(b.pr), function(){ removeSale(sale[0], sale[1]); haptic('undo'); renderAll(); toast('Продажа отменена'); });
+}
+function removeSale(ts, id){
+  for (var i=state.sales.length-1;i>=0;i--) { if (state.sales[i][0] === ts && state.sales[i][1] === id) { state.sales.splice(i,1); persist(); return true; } }
+  return false;
+}
+function unsellLast(id){
+  var tk = dayKey(Date.now());
+  for (var i=state.sales.length-1;i>=0;i--) {
+    var s = state.sales[i];
+    if (s[1] === id && dayKey(s[0]) === tk) {
+      state.sales.splice(i,1); persist(); haptic('undo'); renderSell();
+      var b = byId(id); toast('Минус одна: ' + (b ? b.t : 'книга'));
+      return;
+    }
+  }
+}
+
+/* ---------- render: sell ---------- */
+function renderSell(){
+  var tk = dayKey(Date.now()), tq = 0, tsum = 0, oq = 0, osum = 0;
+  state.sales.forEach(function(s){
+    if (dayKey(s[0]) !== tk) return;
+    tq++; tsum += s[2];
+    var b = byId(s[1]); if (b && b.o) { oq++; osum += s[2]; }
+  });
+  $('#sell-sum').innerHTML =
+    '<div class="sum"><div class="sum-label">Сегодня продано</div>' +
+    '<div class="sum-big">' + pcs(tq) + ' · ' + money(tsum) + '</div>' +
+    '<div class="sum-split"><span><i class="dot own"></i>Мои: ' + oq + ' · ' + money(osum) + '</span>' +
+    '<span><i class="dot oth"></i>Другие: ' + (tq-oq) + ' · ' + money(tsum-osum) + '</span></div></div>';
+
+  document.querySelectorAll('[data-filter]').forEach(function(c){ c.classList.toggle('on', c.dataset.filter === ui.filter); });
+  var active = state.books.filter(function(b){ return !b.h; });
+  $('#search').style.display = active.length > 6 ? '' : 'none';
+  $('#sell-filters').style.display = active.length ? '' : 'none';
+  renderGrid();
+}
+function renderGrid(){
+  var maps = soldMaps(), q = ui.q.trim().toLowerCase();
+  var active = state.books.filter(function(b){ return !b.h; });
+  if (!active.length) {
+    $('#grid').innerHTML = '<div class="empty"><b>Пока нет книг</b>Добавьте книги, которые привезли на ярмарку: название, издательство, цену и количество.' +
+      '<button class="btn primary" data-act="add-book" style="margin-top:16px">+ Добавить книгу</button></div>';
+    return;
+  }
+  var list = active.filter(function(b){
+    if (ui.filter === 'own' && !b.o) return false;
+    if (ui.filter === 'oth' && b.o) return false;
+    if (q && (b.t + ' ' + b.p).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+  if (!list.length) { $('#grid').innerHTML = '<div class="empty">Ничего не найдено</div>'; return; }
+  $('#grid').innerHTML = '<div class="grid">' + list.map(function(b){
+    var left = b.q - (maps.all[b.id] || 0), td = maps.today[b.id] || 0;
+    var cls = 'card ' + (b.o ? 'own' : 'oth') + (left <= 0 ? ' out' : '') + (td ? ' has-minus' : '') + (lastSold === b.id ? ' flash' : '');
+    return '<button class="' + cls + '" data-sell="' + esc(b.id) + '">' +
+      (td ? '<span class="c-minus" data-minus="' + esc(b.id) + '" role="button" aria-label="Отменить одну продажу">−1</span>' : '') +
+      '<div class="c-title">' + esc(b.t) + '</div>' +
+      '<div class="c-pub">' + (b.o ? 'Моё издательство' : esc(b.p || 'Другое издательство')) + '</div>' +
+      '<div class="c-row"><span class="c-price">' + money(b.pr) + '</span><span class="c-left">' + (left <= 0 ? 'нет в наличии' : 'ост. ' + left) + '</span></div>' +
+      (td ? '<div class="c-today">сегодня × ' + td + '</div>' : '') +
+      '</button>';
+  }).join('') + '</div>';
+}
+
+/* ---------- render: books ---------- */
+function bookRow(b, all){
+  var sold = all[b.id] || 0, left = b.q - sold;
+  return '<button class="row" data-edit="' + esc(b.id) + '"><div class="r-main"><div class="r-title">' + esc(b.t) + '</div>' +
+    '<div class="r-sub">' + money(b.pr) + ' · привезено ' + b.q + ' · продано ' + sold + '</div></div>' +
+    '<div class="r-end"><small>остаток</small><b>' + left + '</b></div></button>';
+}
+function renderBooks(){
+  var all = soldMaps().all;
+  var active = state.books.filter(function(b){ return !b.h; }), hidden = state.books.filter(function(b){ return b.h; });
+  var h = '<button class="btn primary" data-act="add-book" style="margin-top:2px">+ Добавить книгу</button>';
+  if (!state.books.length) h += '<div class="empty">Список пуст. Нажмите «Добавить книгу».</div>';
+  grouped(active).forEach(function(g){
+    var tot = g[1].reduce(function(a,b){ return a + b.q - (all[b.id]||0); }, 0);
+    h += '<div class="group-h"><span>' + esc(groupName(g[0])) + '</span><span>остаток ' + tot + ' шт</span></div><div class="list">' +
+      g[1].map(function(b){ return bookRow(b, all); }).join('') + '</div>';
+  });
+  if (hidden.length) {
+    h += '<div class="group-h"><span>Скрыты из продажи</span><span></span></div><div class="list">' +
+      hidden.map(function(b){ return bookRow(b, all); }).join('') + '</div>';
+  }
+  h += '<div class="section-t">Данные</div>' +
+    '<div class="btns"><button class="btn" data-act="backup">Резервная копия</button><button class="btn" data-act="restore">Восстановить</button></div>' +
+    '<button class="btn danger" data-act="reset-sales">Обнулить продажи (новая ярмарка)</button>' +
+    '<div class="hint">' + (cloud ? 'Данные сохраняются в облаке Telegram и в памяти телефона — откроется так же на любом вашем устройстве.' : 'Сейчас приложение открыто не из Telegram — данные хранятся только в этом браузере.') + '</div>';
+  $('#v-books').innerHTML = h;
+}
+
+/* ---------- render: report ---------- */
+function periodKey(){ return ui.period === 'today' ? dayKey(Date.now()) : ui.period; }
+function periodSales(){
+  if (ui.period === 'all') return state.sales;
+  var k = periodKey();
+  return state.sales.filter(function(s){ return dayKey(s[0]) === k; });
+}
+function periodTitle(){ return ui.period === 'all' ? 'вся ярмарка' : dayFull(periodKey()); }
+function buildReport(){
+  var sales = periodSales(), per = {}, tot = { q:0, s:0 }, own = { q:0, s:0 };
+  sales.forEach(function(s){
+    var r = per[s[1]] || (per[s[1]] = { q:0, s:0, prices:{} });
+    r.q++; r.s += s[2]; r.prices[s[2]] = 1;
+    tot.q++; tot.s += s[2];
+    var b = byId(s[1]); if (b && b.o) { own.q++; own.s += s[2]; }
+  });
+  var books = Object.keys(per).map(function(id){ return byId(id) || { id:id, t:'Удалённая книга', o:false, p:'—', pr:0, q:0 }; });
+  var groups = grouped(books).map(function(g){
+    var gq = 0, gs = 0;
+    g[1].forEach(function(b){ gq += per[b.id].q; gs += per[b.id].s; });
+    g[1].sort(function(a,b){ return per[b.id].s - per[a.id].s; });
+    return { key:g[0], name:groupName(g[0]), q:gq, s:gs, books:g[1] };
+  });
+  return { sales:sales, per:per, tot:tot, own:own, oth:{ q:tot.q-own.q, s:tot.s-own.s }, groups:groups };
+}
+function renderReport(){
+  var days = {}; days[dayKey(Date.now())] = 1;
+  state.sales.forEach(function(s){ days[dayKey(s[0])] = 1; });
+  var dk = Object.keys(days).sort().reverse(), today = dayKey(Date.now());
+  if (ui.period !== 'today' && ui.period !== 'all' && !days[ui.period]) ui.period = 'today';
+  var chips = '<div class="chips">' + dk.map(function(k){
+    var val = k === today ? 'today' : k;
+    return '<button class="chip' + (ui.period === val ? ' on' : '') + '" data-period="' + val + '">' + dayLabel(k) + '</button>';
+  }).join('') + '<button class="chip' + (ui.period === 'all' ? ' on' : '') + '" data-period="all">Вся ярмарка</button></div>';
+
+  var R = buildReport(), all = soldMaps().all, h = chips;
+  h += '<div class="kpis">' +
+    '<div class="kpi main"><div class="k">Всего</div><b>' + pcs(R.tot.q) + '</b><div class="s">' + money(R.tot.s) + '</div></div>' +
+    '<div class="kpi"><div class="k"><i class="dot own"></i>Мои</div><b>' + pcs(R.own.q) + '</b><div class="s">' + money(R.own.s) + '</div></div>' +
+    '<div class="kpi"><div class="k"><i class="dot oth"></i>Другие</div><b>' + pcs(R.oth.q) + '</b><div class="s">' + money(R.oth.s) + '</div></div></div>';
+
+  if (!R.tot.q) {
+    h += '<div class="empty">За этот период продаж нет</div>';
+    $('#v-report').innerHTML = h; return;
+  }
+  R.groups.forEach(function(g){
+    h += '<div class="group-h"><span>' + esc(g.name) + '</span><span>' + pcs(g.q) + ' · ' + money(g.s) + '</span></div><div class="list">' +
+      g.books.map(function(b){
+        var r = R.per[b.id], pr = Object.keys(r.prices);
+        var sub = pr.length === 1 ? r.q + ' × ' + money(+pr[0]) : pcs(r.q);
+        var left = byId(b.id) ? ' · остаток ' + (b.q - (all[b.id]||0)) : '';
+        return '<div class="row"><div class="r-main"><div class="r-title">' + esc(b.t) + '</div><div class="r-sub">' + sub + left + '</div></div>' +
+          '<div class="r-end"><b>' + money(r.s) + '</b></div></div>';
+      }).join('') + '</div>';
+  });
+  h += '<button class="btn primary" data-act="copy-report" style="margin-top:16px">📋 Скопировать отчёт</button>';
+
+  var log = R.sales.slice().sort(function(a,b){ return b[0]-a[0]; });
+  h += '<details class="log"><summary>Все продажи за период (' + log.length + ') ▾</summary><div class="list">' +
+    log.map(function(s){
+      var b = byId(s[1]);
+      var t = ui.period === 'all' ? dayLabel(dayKey(s[0])) + ' ' + timeLabel(s[0]) : timeLabel(s[0]);
+      return '<div class="row"><div class="r-time' + (ui.period === 'all' ? ' wide' : '') + '">' + t + '</div><div class="r-main"><div class="r-title">' + esc(b ? b.t : 'Удалённая книга') + '</div></div>' +
+        '<div class="r-end">' + money(s[2]) + '</div><button class="del" data-delsale="' + s[0] + '|' + esc(s[1]) + '" aria-label="Удалить продажу">×</button></div>';
+    }).join('') + '</div></details>';
+  $('#v-report').innerHTML = h;
+}
+function reportText(){
+  var R = buildReport(), all = soldMaps().all;
+  var L = ['📚 Отчёт по продажам: ' + periodTitle(), 'Итого: ' + pcs(R.tot.q) + ' · ' + money(R.tot.s),
+           'Мои: ' + pcs(R.own.q) + ' · ' + money(R.own.s) + '  |  Другие: ' + pcs(R.oth.q) + ' · ' + money(R.oth.s)];
+  R.groups.forEach(function(g){
+    L.push('', g.name.toUpperCase() + ' — ' + pcs(g.q) + ' · ' + money(g.s));
+    g.books.forEach(function(b){
+      var r = R.per[b.id], pr = Object.keys(r.prices);
+      var mid = pr.length === 1 ? r.q + ' × ' + num(+pr[0]) + ' = ' + money(r.s) : pcs(r.q) + ' = ' + money(r.s);
+      L.push('• ' + b.t + ' — ' + mid + (byId(b.id) ? ' (ост. ' + (b.q - (all[b.id]||0)) + ')' : ''));
+    });
+  });
+  return L.join('\n');
+}
+
+/* ---------- copy ---------- */
+function copyText(text, okMsg){
+  function fallback(){
+    var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly','');
+    ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    var ok = false; try { ok = document.execCommand('copy'); } catch(e){}
+    ta.remove();
+    if (ok) toast(okMsg || 'Скопировано');
+    else openModal('<h3>Скопируйте вручную<button class="x" data-act="close">×</button></h3><label class="fld"><textarea readonly>' + esc(text) + '</textarea></label><div class="hint">Нажмите на текст и удерживайте, чтобы выделить и скопировать.</div>');
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function(){ toast(okMsg || 'Скопировано'); }, fallback);
+      return;
+    }
+  } catch(e){}
+  fallback();
+}
+
+/* ---------- modal ---------- */
+var ov = $('#ov');
+function openModal(html){
+  ov.innerHTML = '<div class="sheet">' + html + '</div>';
+  ov.classList.add('on');
+  if (inTG && ver('6.1')) { try { tg.BackButton.show(); } catch(e){} }
+}
+function closeModal(){
+  ov.classList.remove('on'); ov.innerHTML = '';
+  if (inTG && ver('6.1')) { try { tg.BackButton.hide(); } catch(e){} }
+}
+if (inTG && ver('6.1')) { try { tg.BackButton.onClick(closeModal); } catch(e){} }
+ov.addEventListener('click', function(e){ if (e.target === ov) closeModal(); });
+
+var lastOwn = true;
+function openForm(id){
+  var b = id ? byId(id) : null, own = b ? b.o : lastOwn;
+  var pubs = {}; state.books.forEach(function(x){ if (!x.o && x.p.trim()) pubs[x.p.trim()] = 1; });
+  var sold = b ? (soldMaps().all[b.id] || 0) : 0;
+  openModal(
+    '<h3>' + (b ? 'Редактировать книгу' : 'Новая книга') + '<button class="x" data-act="close">×</button></h3>' +
+    '<label class="fld">Название<input id="f-t" value="' + esc(b ? b.t : '') + '" placeholder="Например: Думай и уверуй"></label>' +
+    '<div class="seg' + (own ? '' : ' oth') + '" id="f-seg"><button type="button" data-own="1" class="' + (own ? 'on' : '') + '">Моё издательство</button>' +
+    '<button type="button" data-own="0" class="' + (own ? '' : 'on') + '">Другое</button></div>' +
+    '<label class="fld" id="f-p-wrap" style="' + (own ? 'display:none' : '') + '">Название издательства<input id="f-p" list="f-pubs" value="' + esc(b ? b.p : '') + '" placeholder="Издательство"></label>' +
+    '<datalist id="f-pubs">' + Object.keys(pubs).map(function(p){ return '<option value="' + esc(p) + '">'; }).join('') + '</datalist>' +
+    '<div class="two"><label class="fld">Цена, ₽<input id="f-pr" inputmode="decimal" value="' + (b ? b.pr : '') + '" placeholder="500"></label>' +
+    '<label class="fld">Привезено, шт<input id="f-q" inputmode="numeric" value="' + (b ? b.q : '') + '" placeholder="20"></label></div>' +
+    (b ? '<div class="hint">Продано всего: ' + sold + ' · остаток: ' + (b.q - sold) + '. Если довезли ещё — увеличьте «Привезено».</div>' : '') +
+    '<div class="err" id="f-err"></div>' +
+    '<button class="btn primary" data-act="save-book" data-id="' + esc(b ? b.id : '') + '">Сохранить</button>' +
+    (b ? '<div class="btns"><button class="btn" data-act="toggle-hide" data-id="' + esc(b.id) + '">' + (b.h ? 'Вернуть в продажу' : 'Скрыть из продажи') + '</button>' +
+         '<button class="btn danger" data-act="del-book" data-id="' + esc(b.id) + '">Удалить</button></div>' : '')
+  );
+  if (!b) setTimeout(function(){ var el = $('#f-t'); if (el) el.focus(); }, 60);
+}
+function saveBook(id){
+  var t = $('#f-t').value.trim(), own = $('#f-seg .on').dataset.own === '1', p = $('#f-p').value.trim();
+  var pr = parseNum($('#f-pr').value), qs = $('#f-q').value.trim(), q = qs === '' ? 0 : parseNum(qs);
+  var err = '';
+  if (!t) err = 'Введите название книги';
+  else if (!own && !p) err = 'Укажите издательство';
+  else if (!isFinite(pr) || pr < 0) err = 'Укажите цену';
+  else if (!isFinite(q) || q < 0) err = 'Количество — целое число';
+  if (err) { $('#f-err').textContent = err; haptic('warn'); return; }
+  q = Math.floor(q); lastOwn = own;
+  var b = id ? byId(id) : null;
+  if (b) { b.t = t; b.o = own; b.p = own ? '' : p; b.pr = pr; b.q = q; }
+  else state.books.push({ id:uid(), t:t, o:own, p:own ? '' : p, pr:pr, q:q, h:false });
+  persist(); closeModal(); renderAll(); haptic('ok');
+  toast(b ? 'Сохранено' : 'Книга добавлена');
+}
+
+function openRestore(){
+  openModal('<h3>Восстановить из копии<button class="x" data-act="close">×</button></h3>' +
+    '<label class="fld">Вставьте текст резервной копии<textarea id="r-data" placeholder="{&quot;v&quot;:1,…}"></textarea></label>' +
+    '<div class="err" id="r-err"></div>' +
+    '<button class="btn primary" data-act="do-restore">Восстановить</button>' +
+    '<div class="hint">Текущие книги и продажи будут заменены данными из копии.</div>');
+}
+
+/* ---------- tabs ---------- */
+function showTab(t){
+  ui.tab = t; saveUI();
+  ['sell','books','report'].forEach(function(x){ $('#v-' + x).classList.toggle('on', x === t); });
+  document.querySelectorAll('[data-tab]').forEach(function(b){ b.classList.toggle('on', b.dataset.tab === t); });
+  renderTab(); window.scrollTo(0, 0);
+}
+function renderTab(){ if (ui.tab === 'sell') renderSell(); else if (ui.tab === 'books') renderBooks(); else renderReport(); }
+function renderAll(){ renderTab(); }
+
+/* ---------- events ---------- */
+document.addEventListener('click', function(e){
+  var t = e.target.closest('[data-minus],[data-sell],[data-tab],[data-filter],[data-period],[data-edit],[data-act],[data-delsale],[data-own]');
+  if (!t) return;
+  var d = t.dataset;
+  if (d.minus !== undefined) { e.preventDefault(); unsellLast(d.minus); return; }
+  if (d.sell !== undefined) { sell(d.sell); return; }
+  if (d.tab) { showTab(d.tab); return; }
+  if (d.filter) { ui.filter = d.filter; saveUI(); renderSell(); return; }
+  if (d.period) { ui.period = d.period; renderReport(); return; }
+  if (d.edit) { openForm(d.edit); return; }
+  if (d.own !== undefined) {
+    var own = d.own === '1';
+    document.querySelectorAll('#f-seg button').forEach(function(b){ b.classList.toggle('on', b === t); });
+    $('#f-seg').classList.toggle('oth', !own);
+    $('#f-p-wrap').style.display = own ? 'none' : '';
+    if (!own) $('#f-p').focus();
+    return;
+  }
+  if (d.delsale) {
+    var parts = d.delsale.split('|'), ts = +parts[0], bid = parts.slice(1).join('|'), bk = byId(bid);
+    confirmDlg('Удалить продажу «' + (bk ? bk.t.slice(0,100) : 'книга') + '» в ' + timeLabel(ts) + '?', function(ok){
+      if (ok && removeSale(ts, bid)) { renderAll(); toast('Продажа удалена'); }
+    });
+    return;
+  }
+  switch (d.act) {
+    case 'close': closeModal(); break;
+    case 'add-book': openForm(null); break;
+    case 'save-book': saveBook(d.id || null); break;
+    case 'toggle-hide': {
+      var b = byId(d.id); if (!b) break;
+      b.h = !b.h; persist(); closeModal(); renderAll();
+      toast(b.h ? 'Скрыта из продажи' : 'Возвращена в продажу');
+      break;
+    }
+    case 'del-book': {
+      var b2 = byId(d.id); if (!b2) break;
+      var has = state.sales.some(function(s){ return s[1] === b2.id; });
+      if (has) { alertDlg('У этой книги уже есть продажи, поэтому её нельзя удалить — иначе испортится отчёт. Нажмите «Скрыть из продажи».'); break; }
+      confirmDlg('Удалить «' + b2.t.slice(0,120) + '»?', function(ok){
+        if (!ok) return;
+        state.books = state.books.filter(function(x){ return x.id !== b2.id; });
+        persist(); closeModal(); renderAll(); toast('Книга удалена');
+      });
+      break;
+    }
+    case 'copy-report': copyText(reportText(), 'Отчёт скопирован — вставьте в любой чат'); break;
+    case 'backup': copyText(JSON.stringify(state), 'Копия скопирована — сохраните её в «Избранное»'); break;
+    case 'restore': openRestore(); break;
+    case 'do-restore': {
+      var txt = $('#r-data').value.trim(), parsed = null;
+      try { parsed = normalize(JSON.parse(txt)); } catch(err){}
+      if (!parsed || (!parsed.books.length && !parsed.sales.length)) { $('#r-err').textContent = 'Не похоже на резервную копию'; break; }
+      confirmDlg('Заменить данные: ' + parsed.books.length + ' книг, ' + parsed.sales.length + ' продаж?', function(ok){
+        if (!ok) return;
+        state = parsed; persist(); closeModal(); renderAll(); toast('Данные восстановлены');
+      });
+      break;
+    }
+    case 'reset-sales': {
+      if (!state.sales.length) { toast('Продаж пока нет'); break; }
+      confirmDlg('Удалить все продажи (' + state.sales.length + ')? Книги останутся. Сначала скопируйте отчёт за всю ярмарку.', function(ok){
+        if (!ok) return;
+        state.sales = []; persist(); renderAll(); toast('Продажи обнулены');
+      });
+      break;
+    }
+  }
+});
+$('#search').addEventListener('input', function(e){ ui.q = e.target.value; renderGrid(); });
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Enter' && ov.classList.contains('on') && e.target.tagName === 'INPUT') {
+    var sv = ov.querySelector('[data-act="save-book"]'); if (sv) { e.preventDefault(); sv.click(); }
+  }
+});
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) renderAll(); else if (cloudDirty) flushCloud(); });
+
+/* ---------- start ---------- */
+showTab(ui.tab);
+loadCloud();
+})();
+</script>
+</body>
+</html>
